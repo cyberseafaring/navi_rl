@@ -42,10 +42,21 @@ class SmartBuoyEnvironment(gym.Env):
         self.env_changes = EnvironmentChanges()
         self.monthly_weather, self.monthly_boat_counts = self.env_changes.simulate_environment(0)
 
+        # 将天气条件转换为相应的辐照度值
+        self.weather_to_irradiance()
+
         # 生成一个月的通信需求和消耗数据
         self.generate_monthly_communication_data()
 
         self.reset()  # 重置环境状态
+
+    def weather_to_irradiance(self):
+        irradiance_mapping = {
+            'Sunny': np.random.uniform(600, 800),
+            'Cloudy': np.random.uniform(300, 500),
+            'Rainy': np.random.uniform(20, 80)
+        }
+        self.monthly_weather = [irradiance_mapping[condition] for condition in self.monthly_weather]
 
     def generate_monthly_communication_data(self):
         # 生成一个月中每一天各传感器的能量消耗（单位：Wh）
@@ -143,12 +154,14 @@ class SmartBuoyEnvironment(gym.Env):
         state = np.array([self.battery_level, weather_condition_numeric, communication_demand, channel_quality, self.current_step % 24, self.current_step % 7])
         return state
 
-    def reset(self):
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
         self.current_step = 0
         self.battery_level = self.battery_capacity
         self.monthly_weather, self.monthly_boat_counts = self.env_changes.simulate_environment(0)
+        self.weather_to_irradiance()  # 将天气条件转换为相应的辐照度值
         self.generate_monthly_communication_data()
-        return self.get_state()
+        return self.get_state(), {}
 
     def step(self, action):
         self.apply_action(action)
