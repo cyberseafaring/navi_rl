@@ -169,7 +169,9 @@ class SmartBuoyEnvironment(gym.Env):
         state = self.get_state()
         reward = self.calculate_reward()
         done = self.current_step == 0
-        return state, reward, done, {}
+        truncated = False  # 你可以根据需要设置截断条件
+        info = {}
+        return state, reward, done, truncated, info
 
     def calculate_reward(self):
         # 这里是一个示例逻辑，您应该根据项目的实际情况来调整
