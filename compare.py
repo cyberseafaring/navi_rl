@@ -3,6 +3,7 @@ from stable_baselines3 import DQN
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.evaluation import evaluate_policy
 from env import SmartBuoyEnvironment
+import numpy as np
 
 # 创建向量化环境
 env = make_vec_env(lambda: SmartBuoyEnvironment(), n_envs=1)
@@ -16,14 +17,13 @@ model.learn(total_timesteps=50000)
 # 保存模型
 model.save("dqn_smartbuoy")
 
-import numpy as np
-
+# 定义基线策略
 def random_policy(env):
     obs = env.reset()
-    done = False
+    done = [False]
     days = 0
-    while not done:
-        action = env.action_space.sample()  # 随机选择动作
+    while not done[0]:
+        action = [env.action_space.sample()]  # 随机选择动作
         obs, reward, done, info = env.step(action)
         days += 1
     return days
@@ -31,9 +31,9 @@ def random_policy(env):
 # 使用DQN算法的策略
 def dqn_policy(env, model):
     obs = env.reset()
-    done = False
+    done = [False]
     days = 0
-    while not done:
+    while not done[0]:
         action, _states = model.predict(obs, deterministic=True)
         obs, reward, done, info = env.step(action)
         days += 1
