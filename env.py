@@ -14,7 +14,12 @@ class SmartBuoyEnvironment(gym.Env):
         k = 3  # 能源消耗策略的状态数
         m = 2  # 传感器开关状态（开/关）
         
-        self.action_space = spaces.MultiDiscrete([n, n, k, m, m, m])  # 定义动作空间
+        self.n = n
+        self.k = k
+        self.m = m
+        
+        # 将MultiDiscrete动作空间转换为Discrete动作空间
+        self.action_space = spaces.Discrete(n * n * k * m * m * m)  # 定义动作空间
         self.observation_space = spaces.Box(
             low=np.array([0, 0, 0, 0, 0, 0, 0]),  # 最小值
             high=np.array([400, 2, 100, 1, 23, 6, 1]),  # 最大值，假设时间为0-23小时，日期为0-6（周一到周日），传感器模式为0-1
@@ -122,7 +127,13 @@ class SmartBuoyEnvironment(gym.Env):
             self.sensor_mode = 0  # Normal模式
 
     def apply_action(self, action):
-        power_index, frequency_index, strategy_index, vhf_on, ais_on, camera_on = action
+        # 将Discrete动作空间转换为MultiDiscrete动作空间
+        power_index = action % self.n
+        frequency_index = (action // self.n) % self.n
+        strategy_index = (action // (self.n * self.n)) % self.k
+        vhf_on = (action // (self.n * self.n * self.k)) % self.m
+        ais_on = (action // (self.n * self.n * self.k * self.m)) % self.m
+        camera_on = (action // (self.n * self.n * self.k * self.m * self.m)) % self.m
 
         self.communication_power = self.communication_power_levels[power_index]
         self.communication_frequency = self.communication_frequency_levels[frequency_index]
