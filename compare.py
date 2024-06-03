@@ -9,7 +9,25 @@ import numpy as np
 env = make_vec_env(lambda: SmartBuoyEnvironment(), n_envs=1)
 
 # 创建DQN模型
-model = DQN("MlpPolicy", env, verbose=1, learning_rate=1e-3, buffer_size=10000, learning_starts=1000, batch_size=32, tau=1.0, gamma=0.99, train_freq=4, gradient_steps=1, target_update_interval=250, exploration_fraction=0.1, exploration_initial_eps=1.0, exploration_final_eps=0.05, max_grad_norm=10, tensorboard_log="./dqn_smartbuoy_tensorboard/")
+model = DQN(
+    "MlpPolicy", 
+    env, 
+    verbose=1, 
+    learning_rate=1e-4,  # 调整学习率
+    buffer_size=50000,  # 增加经验回放缓冲区大小
+    learning_starts=1000, 
+    batch_size=64,  # 增加批量大小
+    tau=1.0, 
+    gamma=0.99, 
+    train_freq=4, 
+    gradient_steps=1, 
+    target_update_interval=500,  # 增加目标网络更新间隔
+    exploration_fraction=0.1, 
+    exploration_initial_eps=1.0, 
+    exploration_final_eps=0.01,  # 减少最终探索率
+    max_grad_norm=10, 
+    tensorboard_log="./dqn_smartbuoy_tensorboard/"
+)
 
 # 训练模型
 model.learn(total_timesteps=50000)

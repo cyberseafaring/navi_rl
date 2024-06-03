@@ -15,8 +15,8 @@ class SmartBuoyEnvironment(gym.Env):
         
         self.action_space = spaces.Discrete(n * n * k)  # 定义动作空间
         self.observation_space = spaces.Box(
-            low=np.array([0, 0, 0, 0, 0, 0]),  # 最小值
-            high=np.array([400, 2, 100, 1, 23, 6]),  # 最大值，假设时间为0-23小时，日期为0-6（周一到周日）
+            low=np.array([0, 0, 0, 0, 0, 0, 0]),  # 最小值
+            high=np.array([400, 2, 100, 1, 23, 6, 2]),  # 最大值，假设时间为0-23小时，日期为0-6（周一到周日），传感器模式为0-2
             dtype=np.float32
         )
         
@@ -151,7 +151,7 @@ class SmartBuoyEnvironment(gym.Env):
         channel_quality = self.channel_quality
 
         # 组合成一个观测向量
-        state = np.array([self.battery_level, weather_condition_numeric, communication_demand, channel_quality, self.current_step % 24, self.current_step % 7])
+        state = np.array([self.battery_level, weather_condition_numeric, communication_demand, channel_quality, self.current_step % 24, self.current_step % 7, self.sensor_mode])
         return state
 
     def reset(self, seed=None, options=None):
@@ -176,4 +176,8 @@ class SmartBuoyEnvironment(gym.Env):
     def calculate_reward(self):
         # 这里是一个示例逻辑，您应该根据项目的实际情况来调整
         reward = self.communication_success_rate - (self.communication_demand / 100)
+        if self.battery_level < 50:
+            reward -= 1  # 电池电量过低时，减少奖励
+        if self.sensor_mode == "LowPower":
+            reward += 0.5  # 低功耗模式下，增加奖励
         return reward
