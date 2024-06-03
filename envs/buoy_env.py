@@ -3,7 +3,7 @@
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
-from external_env import ExternalEnvironment
+from .external_env import ExternalEnvironment
 
 class SmartBuoyEnvironment(gym.Env):
     metadata = {'render.modes': ['human']}
