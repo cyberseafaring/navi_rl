@@ -16,7 +16,7 @@ class SmartBuoyEnvironment(gym.Env):
         self.action_space = spaces.Discrete(n * n * k)  # 定义动作空间
         self.observation_space = spaces.Box(
             low=np.array([0, 0, 0, 0, 0, 0, 0]),  # 最小值
-            high=np.array([400, 2, 100, 1, 23, 6, 2]),  # 最大值，假设时间为0-23小时，日期为0-6（周一到周日），传感器模式为0-2
+            high=np.array([400, 2, 100, 1, 23, 6, 1]),  # 最大值，假设时间为0-23小时，日期为0-6（周一到周日），传感器模式为0-1
             dtype=np.float32
         )
         
@@ -37,6 +37,7 @@ class SmartBuoyEnvironment(gym.Env):
         self.current_step = 0
         self.max_steps = 30  # 每个周期的最大步数，比如一个月
         self.operational_days = 0  # 已操作的天数
+        self.sensor_mode = 0  # 传感器模式，0表示Normal，1表示LowPower
 
         # 动态生成的属性
         self.env_changes = EnvironmentChanges()
@@ -112,12 +113,12 @@ class SmartBuoyEnvironment(gym.Env):
 
     def adjust_sensor_mode(self):
         if self.battery_level < 100:
-            self.sensor_mode = "LowPower"
+            self.sensor_mode = 1  # LowPower模式
             # 关闭部分摄像头
             self.camera_consumption_weekday *= 0.5
             self.camera_consumption_weekend *= 0.5
         else:
-            self.sensor_mode = "Normal"
+            self.sensor_mode = 0  # Normal模式
 
     def apply_action(self, action):
         n = 3  # 通信功率和通信频率的状态数
@@ -178,6 +179,6 @@ class SmartBuoyEnvironment(gym.Env):
         reward = self.communication_success_rate - (self.communication_demand / 100)
         if self.battery_level < 50:
             reward -= 1  # 电池电量过低时，减少奖励
-        if self.sensor_mode == "LowPower":
+        if self.sensor_mode == 1:  # LowPower模式
             reward += 0.5  # 低功耗模式下，增加奖励
         return reward
