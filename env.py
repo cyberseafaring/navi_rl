@@ -12,8 +12,9 @@ class SmartBuoyEnvironment(gym.Env):
         # 定义动作空间的维度
         n = 3  # 通信功率和通信频率的状态数
         k = 3  # 能源消耗策略的状态数
+        m = 2  # 传感器开关状态（开/关）
         
-        self.action_space = spaces.Discrete(n * n * k)  # 定义动作空间
+        self.action_space = spaces.MultiDiscrete([n, n, k, m, m, m])  # 定义动作空间
         self.observation_space = spaces.Box(
             low=np.array([0, 0, 0, 0, 0, 0, 0]),  # 最小值
             high=np.array([400, 2, 100, 1, 23, 6, 1]),  # 最大值，假设时间为0-23小时，日期为0-6（周一到周日），传感器模式为0-1
@@ -121,21 +122,21 @@ class SmartBuoyEnvironment(gym.Env):
             self.sensor_mode = 0  # Normal模式
 
     def apply_action(self, action):
-        n = 3  # 通信功率和通信频率的状态数
-        k = 3  # 能源消耗策略的状态数
-
-        power_index = action % n
-        frequency_index = (action // n) % n
-        strategy_index = action // (n * n)
+        power_index, frequency_index, strategy_index, vhf_on, ais_on, camera_on = action
 
         self.communication_power = self.communication_power_levels[power_index]
         self.communication_frequency = self.communication_frequency_levels[frequency_index]
         self.energy_strategy = strategy_index
 
+        # 控制传感器开关
+        self.vhf_on = vhf_on
+        self.ais_on = ais_on
+        self.camera_on = camera_on
+
         # 假设通信成功率与通信功率和频率相关
         self.communication_success_rate = self.calculate_communication_success_rate(power_index, frequency_index)
 
-        print(f"Action applied: Power index={power_index}, Frequency index={frequency_index}, Strategy index={strategy_index}")
+        print(f"Action applied: Power index={power_index}, Frequency index={frequency_index}, Strategy index={strategy_index}, VHF on={vhf_on}, AIS on={ais_on}, Camera on={camera_on}")
 
     def calculate_communication_success_rate(self, power_index, frequency_index):
         # 这里是一个示例逻辑，您应该根据项目的实际情况来调整
