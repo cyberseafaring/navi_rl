@@ -10,11 +10,11 @@ class ExternalEnvironment:
         self.weather_probabilities = [0.5, 0.3, 0.2]  # 晴天50%，多云30%，雨天20%
         
         # 定义船只流量
-        self.weekday_boat_range = (5, 15)  # 工作日船只流量范围
-        self.weekend_boat_range = (10, 25)  # 周末船只流量范围
+        self.weekday_boat_range = (150, 180)  # 工作日船只流量范围/每天
+        self.weekend_boat_range = (170, 250)  # 周末船只流量范围/每天
         
         # 定义时间变化
-        self.day_hours = 12  # 假设白天12小时
+        self.day_hours = 16  # 假设白天16小时
         self.night_hours = 24 - self.day_hours
 
     def simulate_monthly_weather(self):
