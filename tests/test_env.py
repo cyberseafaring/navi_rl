@@ -49,7 +49,7 @@ class TestSmartBuoyEnvironment(unittest.TestCase):
         self.assertIsInstance(reward, float)
 
     def test_reset_function(self):
-        state, _ = self.env.reset()
+        state = self.env.reset()
         self.assertEqual(len(state), 7)
         self.assertEqual(self.env.current_step, 0)
         self.assertEqual(self.env.battery_level, self.env.battery_capacity)

@@ -3,6 +3,7 @@
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
+import matplotlib.pyplot as plt
 from .external_env import ExternalEnvironment
 
 class SmartBuoyEnvironment(gym.Env):
@@ -21,109 +22,154 @@ class SmartBuoyEnvironment(gym.Env):
         # 定义动作空间
         self.action_space = spaces.MultiDiscrete([2, 2, 2, 2, 3])  # 航标灯、VHF、摄像头、毫米波雷达、通信QoS
         
-        # 初始化外部环境
-        self.external_env = ExternalEnvironment(seed=42)
-        self.monthly_weather = self.external_env.simulate_monthly_weather()
-        self.monthly_boat_traffic = self.external_env.simulate_monthly_boat_traffic()
-        self.daily_time = self.external_env.simulate_daily_time()
-        
-        # 初始化内部状态
+        # 环境状态初始化
         self.battery_capacity = 400  # Ah
         self.battery_level = self.battery_capacity  # 初始满电
         self.solar_panel_efficiency = 0.15  # 太阳能板效率
         self.solar_panel_size = 1  # m²
+        # 日照
+        self.solar_irradiance_range = {
+            'Sunny': (600, 800),  # 晴天太阳辐照度范围（W/m²）
+            'Cloudy': (300, 500),  # 多云天太阳辐照度范围（W/m²）
+            'Rainy': (20, 80)     # 雨天太阳辐照度范围（W/m²）
+        }
+        self.solar_panel_size = 1  # 太阳能板大小为1平方米
+        self.solar_panel_efficiency = 0.15  # 太阳能板效率为15%
+
+        # 初始化其它状态
+        self.communication_demand = 0  # 初始通信需求
+        self.channel_quality = 0  # 初始通信信道质量
         self.current_step = 0
         self.max_steps = 30  # 每个周期的最大步数，比如一个月
-        self.sensor_mode = 0  # 传感器模式，0表示Normal，1表示LowPower
+        self.operational_days = 0  # 已操作的天数
+
+        # 新增属性
+        self.lantern_on = False
+        self.vhf_on = False
+        self.camera_on = False
+        self.radar_on = False
+        self.qos_level = 0
+
+        # 动态生成的属性
+        self.monthly_sunlight_sequence = self.generate_monthly_sunlight_sequence()  # 预生成一个月的日照序列
+
+        # 生成一个月的通信需求和消耗数据
+        self.generate_monthly_communication_data()
 
         self.reset()  # 重置环境状态
 
-    def reset(self, seed=None, options=None):
-        super().reset(seed=seed)
-        self.current_step = 0
-        self.battery_level = self.battery_capacity
-        self.monthly_weather = self.external_env.simulate_monthly_weather()
-        self.monthly_boat_traffic = self.external_env.simulate_monthly_boat_traffic()
-        self.daily_time = self.external_env.simulate_daily_time()
-        return self.get_state(), {}
+    def generate_monthly_sunlight_sequence(self):
+        np.random.seed(3)  # 设置随机种子以保持结果一致性，可以选择去掉以产生不同的序列
+        self.weather_conditions = np.random.choice(['Sunny', 'Cloudy', 'Rainy'], 30, p=[0.5, 0.3, 0.2])  # 假设晴天的概率为50%，多云为30%，雨天为20%
+                
+        daily_solar_generation = []
+        for condition in self.weather_conditions:
+                irradiance_range = self.solar_irradiance_range[condition]
+                irradiance = np.random.uniform(irradiance_range[0], irradiance_range[1])
+                daily_generation = self.solar_panel_size * self.solar_panel_efficiency * irradiance
+                daily_solar_generation.append(daily_generation)
+                
+        return daily_solar_generation  
 
-    def step(self, action):
-        self.apply_action(action)
-        self.update_environment()
-        state = self.get_state()
-        reward = self.calculate_reward()
-        done = self.current_step == 0
-        truncated = False  # 你可以根据需要设置截断条件
-        info = {}
-        return state, reward, done, truncated, info
+    def generate_monthly_communication_data(self):
+        # 生成一个月中每一天各传感器的能量消耗（单位：Wh）
+        self.vhf_consumption_daily = np.random.uniform(5, 18, 30)  # VHF传感器每天的能量消耗
+        self.ais_consumption_daily = np.random.uniform(1, 4, 30)  # AIS传感器每天的能量消耗
+        
+        # 4目摄像头在工作日和周末的能耗不同
+        self.camera_consumption_weekday = np.random.uniform(18, 35, 30)  # 工作日
+        self.camera_consumption_weekend = np.random.uniform(35, 65, 30)  # 周末
+        for i in range(30):
+            if (i+1) % 7 == 0 or (i+2) % 7 == 0:  # 周末
+                self.camera_consumption_weekday[i] = self.camera_consumption_weekend[i]
 
-    def apply_action(self, action):
-        self.lantern_on, self.vhf_on, self.camera_on, self.radar_on, self.qos_level = action
+        # 航标待机状态的基础能耗
+        self.standby_consumption_daily = np.random.uniform(8, 12, 30)
 
-        # 控制航标灯
-        if self.daily_time[self.current_step % 24] < 6 or self.daily_time[self.current_step % 24] >= 18:
-            self.lantern_on = 1  # 夜晚开启
-        else:
-            self.lantern_on = 0  # 白天关闭
+        # 计算总能耗
+        self.total_consumption_daily = self.vhf_consumption_daily + self.ais_consumption_daily + self.camera_consumption_weekday + self.standby_consumption_daily
 
-        print(f"Action applied: Lantern on={self.lantern_on}, VHF on={self.vhf_on}, Camera on={self.camera_on}, Radar on={self.radar_on}, QoS level={self.qos_level}")
+        # 通信需求模型
+        # 假设通信需求主要由AIS和VHF活动驱动，同时摄像头数据传输对通信需求有较大影响
+        self.communication_demand_daily = (self.vhf_consumption_daily + self.ais_consumption_daily) * 1.2 + self.camera_consumption_weekday * 0.75
+
+        # 根据通信需求调整因子，反映不同天气条件下的通信难度
+        weather_impact = np.array([1.1 if condition == 'Sunny' else 1.3 if condition == 'Cloudy' else 1.5 for condition in self.weather_conditions])
+        self.communication_demand_daily *= weather_impact
 
     def update_environment(self):
-        # 根据当前天气更新太阳能发电量
-        day_index = self.current_step % 30
-        solar_generation = self.solar_panel_size * self.solar_panel_efficiency * self.external_env.get_solar_irradiance(self.monthly_weather[day_index])
+        # 计算当天的太阳能充电量
+        solar_generation = self.monthly_sunlight_sequence[self.current_step]
+        # 计算当天的总能量消耗
+        total_consumption = self.calculate_energy_consumption()
 
-        # 更新蓄电池电量，考虑能量消耗和太阳能发电
-        self.battery_level += solar_generation - self.calculate_energy_consumption()
-        self.battery_level = max(0, min(self.battery_level, self.battery_capacity))  # 保证电量在有效范围内
+        # 更新电池电量
+        self.battery_level += solar_generation - total_consumption
+        # 确保电池电量不会超过最大容量，也不会低于0
+        self.battery_level = max(0, min(self.battery_level, self.battery_capacity))
 
-        # 更新当前步数
+        # 更新步骤
         self.current_step += 1
-        if self.current_step >= self.max_steps:
-            self.current_step = 0  # 或其他逻辑，如终止环境等
 
     def calculate_energy_consumption(self):
-        # 计算能耗
         energy_consumption = 0
         if self.lantern_on:
-            energy_consumption += 5  # 航标灯能耗
+            energy_consumption += 5  # 假设灯笼每小时消耗5Wh
         if self.vhf_on:
-            energy_consumption += 10  # VHF能耗
+            energy_consumption += 10  # 假设VHF每小时消耗10Wh
         if self.camera_on:
-            energy_consumption += 15  # 摄像头能耗
+            energy_consumption += 15  # 假设摄像头每小时消耗15Wh
         if self.radar_on:
-            energy_consumption += 20  # 毫米波雷达能耗
-        energy_consumption += self.qos_level * 5  # 通信QoS能耗
+            energy_consumption += 20  # 假设雷达每小时消耗20Wh
         return energy_consumption
 
-    def get_state(self):
-        # 将天气状况从字符串映射到数值
-        weather_mapping = {'Sunny': 0, 'Cloudy': 1, 'Rainy': 2}
-        weather_condition_numeric = weather_mapping.get(self.monthly_weather[self.current_step % 30], 0)
+    def step(self, action):
+        # 解析动作
+        self.lantern_on = action[0] == 1
+        self.vhf_on = action[1] == 1
+        self.camera_on = action[2] == 1
+        self.radar_on = action[3] == 1
+        self.qos_level = action[4]
 
-        # 获取当前的通信需求和通信信道质量
-        communication_demand = self.monthly_boat_traffic[self.current_step % 30]
-        channel_quality = 1  # 假设信道质量为1
+        # 更新环境
+        self.update_environment()
 
-        # 组合成一个观测向量
-        state = np.array([self.battery_level, weather_condition_numeric, communication_demand, channel_quality, self.current_step % 24, self.current_step % 7, self.sensor_mode])
-        return state
+        # 计算奖励
+        reward = -self.calculate_energy_consumption()
+        done = self.current_step >= self.max_steps
+        truncated = False
 
-    def calculate_reward(self):
-        # 这里是一个示例逻辑，您应该根据项目的实际情况来调整
-        reward = -self.calculate_energy_consumption()  # 能耗越低，奖励越高
-        if self.battery_level < 50:
-            reward -= 10  # 电池电量过低时，减少奖励
-        if self.sensor_mode == 1:  # LowPower模式
-            reward += 5  # 低功耗模式下，增加奖励
-        return reward
+        return self._get_obs(), float(reward), done,truncated, {}
 
-# 示例用法
+    def _get_obs(self):
+        current_hour = (self.current_step % 24)
+        current_day = (self.current_step % 7)
+        return np.array([self.battery_level, self.communication_demand, self.channel_quality, self.current_step, current_hour, current_day, int(self.camera_on)])
+
+    def reset(self):
+        self.battery_level = self.battery_capacity
+        self.current_step = 0
+        self.lantern_on = False
+        self.vhf_on = False
+        self.camera_on = False
+        self.radar_on = False
+        self.qos_level = 0
+        return self._get_obs()
+
+    def render(self, mode='human'):
+        plt.figure(figsize=(10, 5))
+        plt.title("Smart Buoy Environment")
+        plt.bar(['Battery Level'], [self.battery_level], color='blue')
+        plt.ylim(0, self.battery_capacity)
+        plt.ylabel('Battery Level (Ah)')
+        plt.xlabel('State')
+        plt.show()
+
 if __name__ == "__main__":
     env = SmartBuoyEnvironment()
-    state, _ = env.reset()
+    state = env.reset()
     print("Initial State:", state)
     for _ in range(10):
         action = env.action_space.sample()
-        state, reward, done, truncated, info = env.step(action)
+        state, reward, done, info = env.step(action)
         print("State:", state, "Reward:", reward, "Done:", done)
