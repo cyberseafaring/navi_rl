@@ -2,28 +2,33 @@ import numpy as np
 
 class ExternalEnvironment:
     def __init__(self, seed=None):
-        if seed is not None:
-            np.random.seed(seed)
-        
+        self.seed = seed
+        self.reset_seed()
+
         # 定义天气条件
         self.weather_conditions = ['Sunny', 'Cloudy', 'Rainy']
         self.weather_probabilities = [0.5, 0.3, 0.2]  # 晴天50%，多云30%，雨天20%
         
         # 定义船只流量
-        self.weekday_boat_range = (150, 180)  # 工作日船只流量范围/每天
-        self.weekend_boat_range = (170, 250)  # 周末船只流量范围/每天
+        self.weekday_boat_range = (250, 350)  # 工作日船只流量范围
+        self.weekend_boat_range = (310, 425)  # 周末船只流量范围
         
         # 定义时间变化
-        self.day_hours = 16  # 假设白天16小时
+        self.day_hours = 12  # 假设白天12小时
         self.night_hours = 24 - self.day_hours
 
+    def reset_seed(self):
+        if self.seed is not None:
+            np.random.seed(self.seed)
+            self.seed += 1  # 每次重置时更新随机种子
+
     def simulate_monthly_weather(self):
-        # 模拟一个月的天气变化
+        self.reset_seed()
         monthly_weather = np.random.choice(self.weather_conditions, 30, p=self.weather_probabilities)
         return monthly_weather
 
     def simulate_monthly_boat_traffic(self):
-        # 模拟一个月的船只流量
+        self.reset_seed()
         monthly_boat_traffic = []
         for day in range(30):
             if day % 7 == 5 or day % 7 == 6:  # 周末
@@ -34,12 +39,12 @@ class ExternalEnvironment:
         return monthly_boat_traffic
 
     def simulate_daily_time(self):
-        # 模拟一天的时间变化，区分白天和夜晚
+        self.reset_seed()
         daily_time = np.arange(24)
         return daily_time
 
     def get_solar_irradiance(self, weather):
-        # 根据天气条件返回相应的太阳能辐照度
+        self.reset_seed()
         irradiance_mapping = {
             'Sunny': np.random.uniform(600, 800),
             'Cloudy': np.random.uniform(300, 500),
@@ -48,21 +53,21 @@ class ExternalEnvironment:
         return irradiance_mapping[weather]
 
     def get_energy_consumption(self, hour):
-        # 根据时间返回相应的能耗
         if 6 <= hour < 18:  # 白天
             return 'day'
         else:  # 夜晚
             return 'night'
 
-    def monitor_boats(self, boat_distance):
-        # 监测船只，如果船只在500米以内则需要主动监测
-        if boat_distance <= 500:
-            return True  # 需要监测
-        return False  # 不需要监测
+    def monitor_boats(self, boat_count):
+        self.reset_seed()
+        # 假设船只在浮标500米以内的概率为10%
+        nearby_boats = np.random.binomial(boat_count, 0.1)
+        # 确保同一时间段在浮标附近的船只数量不超过3艘
+        return min(nearby_boats, 3)
 
 # 示例用法
 if __name__ == "__main__":
-    env = ExternalEnvironment(seed=42)
+    env = ExternalEnvironment(seed=11)
     monthly_weather = env.simulate_monthly_weather()
     monthly_boat_traffic = env.simulate_monthly_boat_traffic()
     daily_time = env.simulate_daily_time()
@@ -70,3 +75,8 @@ if __name__ == "__main__":
     print("Monthly Weather:", monthly_weather)
     print("Monthly Boat Traffic:", monthly_boat_traffic)
     print("Daily Time:", daily_time)
+
+    # 模拟某一天的船只监测
+    boat_count = monthly_boat_traffic[0]
+    nearby_boats = env.monitor_boats(boat_count)
+    print("Nearby Boats:", nearby_boats)
