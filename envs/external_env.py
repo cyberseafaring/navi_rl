@@ -1,7 +1,3 @@
-# 模拟一个月的天气变化：这将影响太阳能板的能量产出。
-# 模拟一个月的船只流量：每天有一定的随机性，但是周末船只流量稍微大一些。这将决定AIS、摄像头和VHF模块的使用频率。
-# 模拟时间变化：区分白天和夜晚，控制航标灯的能耗和摄像头的使用（夜间能见度不足的情况下控制摄像头开关）。
-
 import numpy as np
 
 class ExternalEnvironment:
@@ -18,7 +14,7 @@ class ExternalEnvironment:
         self.weekend_boat_range = (10, 25)  # 周末船只流量范围
         
         # 定义时间变化
-        self.day_hours = 24
+        self.day_hours = 12  # 假设白天12小时
         self.night_hours = 24 - self.day_hours
 
     def simulate_monthly_weather(self):
@@ -57,6 +53,12 @@ class ExternalEnvironment:
             return 'day'
         else:  # 夜晚
             return 'night'
+
+    def monitor_boats(self, boat_distance):
+        # 监测船只，如果船只在500米以内则需要主动监测
+        if boat_distance <= 500:
+            return True  # 需要监测
+        return False  # 不需要监测
 
 # 示例用法
 if __name__ == "__main__":
